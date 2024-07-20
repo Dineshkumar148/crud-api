@@ -1,3 +1,4 @@
+import { Op } from "sequelize";
 import Employee from "../models/employee.js";
 
 // Create a new employee
@@ -5,51 +6,86 @@ export const createEmp = async (req, res) => {
   const { firstname, lastname, email, designation } = req.body;
 
   // Check for missing fields
-  if (!firstname || !lastname || !email || !designation) {
-    return res.status(400).json({ error: error.message ||  "All fields are required" });
+  if (!firstname || !lastname || !designation) {
+    return res.status(400).json({ error: "All fields are required except email" });
   }
 
+  // Email validation regex
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
   try {
-    // Check if the email already exists
-    const existingEmployee = await Employee.findOne({ where: { email } });
-    if (existingEmployee) {
-      return res
-        .status(409)
-        .json({ error: "Email already exists. Please try a different one." });
+    if (email) {
+      // Validate email format
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: "Invalid hari email format" });
+      }
+
+      // Check if the email already exists, excluding null values
+      const existingEmployee = await Employee.findOne({
+        where: {
+          email: {
+            [Op.ne]: null,
+            [Op.eq]: email
+          }
+        }
+      });
+      if (existingEmployee) {
+        return res.status(409).json({ error: "Email already exists. Please try a different one." });
+      }
     }
 
     console.log("Attempting to create employee with data:", req.body);
     const newEmployee = await Employee.create({
       firstname,
       lastname,
-      email,
+      email: email || null,
       designation,
     });
     res.status(201).json(newEmployee);
   } catch (error) {
     console.error("Error creating employee:", error);
-    return res
-      .status(500)
-      .json({ error: error.message || "Internal server error" });
+    return res.status(500).json({ error: error.message || "Internal server error" });
   }
 };
 
-// Get all employees in alphabetical order by firstname
+// Get all employees in alphabetical order by id
 export const getAllEmp = async (req, res) => {
   try {
-    const employees = await Employee.findAll({
-      attributes: ["id", "firstname", "lastname", "email", "designation"],
-      order: [["id", "ASC"]], // Sort by firstname in ascending order
-    });
-    res.json(employees);
+    const { skip = 0, take = 10, searchTerm, ...filter } = req.query;
+    const pagination = { offset: Number(skip), limit: Number(take) };
+    const filters = filter || {};
+
+    if (searchTerm) {
+      filters[Op.or] = [
+        { firstname: { [Op.iLike]: `%${searchTerm}%` } },
+        { lastname: { [Op.iLike]: `%${searchTerm}%` } },
+        { email: { [Op.iLike]: `%${searchTerm}%` } },
+        { designation: { [Op.iLike]: `%${searchTerm}%` } },
+      ];
+    }
+
+    // Sorting by firstname in alphabetical order
+    const order = [['id', 'ASC']];
+    const whereCondition = filters[Op.or]
+      ? { [Op.and]: [filters, {}] }
+      : { ...filters };
+
+    const [count, employees] = await Promise.all([
+      Employee.count({ where: whereCondition }),
+      Employee.findAll({
+        attributes: ["id", "firstname", "lastname", "email", "designation"],
+        where: whereCondition,
+        ...pagination,
+        order,
+      }),
+    ]);
+
+    res.json({ count, employees });
   } catch (error) {
     console.log(error);
-    return res
-    .status(500)
-    .json({ error: error.message || "Internal server error" });
+    return res.status(500).json({ error: error.message || "Internal server error" });
   }
 };
-
 // Get an employee by ID
 export const getEmpById = async (req, res) => {
   const { id } = req.params;
@@ -61,13 +97,11 @@ export const getEmpById = async (req, res) => {
     if (employee) {
       res.json(employee);
     } else {
-      res.status(404).json({ error: error.message ||  "Employee not found" });
+      res.status(404).json({ error: "Employee not found" });
     }
   } catch (error) {
     console.log(error);
-    return res
-    .status(500)
-    .json({ error: "Internal server error" });
+    return res.status(500).json({ error: "Internal server error" });
   }
 };
 
@@ -78,16 +112,40 @@ export const updateEmp = async (req, res) => {
 
   // Check for missing fields
   if (!firstname && !lastname && !email && !designation) {
-    return res
-      .status(400)
-      .json({ error: "At least one field is required to update" });
+    return res.status(400).json({ error: "At least one field is required to update" });
   }
+
+  // Email validation regex
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   try {
     const employee = await Employee.findOne({ where: { id } });
 
     if (!employee) {
-      return res.status(404).json({ error: error.message || "Employee not found" });
+      return res.status(404).json({ error: "Employee not found" });
+    }
+
+    if (email) {
+      // Validate email format
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: "Invalid email format" });
+      }
+
+      // Check if the email already exists, excluding null values and the current employee
+      const existingEmployee = await Employee.findOne({
+        where: {
+          email: {
+            [Op.ne]: null,
+            [Op.eq]: email,
+            id: {
+              [Op.ne]: id,
+            }
+          }
+        }
+      });
+      if (existingEmployee) {
+        return res.status(409).json({ error: "Email already exists. Please try a different one." });
+      }
     }
 
     // Update employee details
@@ -101,9 +159,7 @@ export const updateEmp = async (req, res) => {
     res.status(200).json(employee);
   } catch (error) {
     console.log(error);
-    return res
-    .status(500)
-    .json({ error: error.message || "Internal server error" });
+    return res.status(500).json({ error: error.message || "Internal server error" });
   }
 };
 
@@ -115,12 +171,10 @@ export const deleteEmp = async (req, res) => {
     if (deleted) {
       res.status(204).json({ message: "Employee deleted" });
     } else {
-      res.status(404).json({ error: error.message || "Employee not found" });
+      res.status(404).json({ error: "Employee not found" });
     }
   } catch (error) {
     console.log(error);
-    return res
-    .status(500)
-    .json({ error: error.message || "Internal server error" });
+    return res.status(500).json({ error: error.message || "Internal server error" });
   }
 };
