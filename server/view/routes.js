@@ -1,23 +1,24 @@
 import express from 'express';
-import { createEmp, getAllEmp, getEmpById, updateEmp, deleteEmp } from '../controller/userController.js';
+import { createEmp, getAllEmp, getEmpById, updateEmp, deleteEmp, bulkCreateEmp, } from '../controller/userController.js';
 import { sendWhatsAppMessage } from '../controller/whatsapp.js';
 
 const router = express.Router();
 
 // Create a new employee
-router.post('/employees', createEmp);
+router.post('/employee', createEmp);
+router.post('/employee/bulk', bulkCreateEmp);
 
 // Get all employees
-router.get('/employees', getAllEmp);
+router.get('/employee', getAllEmp);
 
 // Get a particular employee by ID
-router.get('/employees/:id', getEmpById);
+router.get('/employee/:id', getEmpById);
 
 // Update an employee by ID
-router.put('/employees/:id', updateEmp);
+router.put('/employee/:id', updateEmp);
 
 // Delete an employee by ID
-router.delete('/employees/:id', deleteEmp);
+router.delete('/employee/:id', deleteEmp);
 
 // whats's App Api Url for send message 
 router.post('/whatsapp', sendWhatsAppMessage);
