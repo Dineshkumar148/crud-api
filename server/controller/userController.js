@@ -137,7 +137,7 @@ export const getAllEmp = async (req, res) => {
       ];
     }
 
-    // Sorting by firstname in alphabetical order
+    // Sorting by id in alphabetical order
     const order = [["id", "ASC"]];
     const whereCondition = filters[Op.or]
       ? { [Op.and]: [filters, {}] }

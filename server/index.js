@@ -9,7 +9,7 @@ const PORT = 8000;
 
 // Use the cors middleware
 app.use(cors({
-  origin: 'http://localhost:4200' 
+  // origin: 'http://localhost:4200' 
 }
 ));
 
